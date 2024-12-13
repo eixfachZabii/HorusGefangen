@@ -4,92 +4,106 @@ import de.kyle.gefangenendilemma.api.Prisoner;
 import de.kyle.gefangenendilemma.api.event.PostMessEvent;
 import de.kyle.gefangenendilemma.api.result.PrisonerMessResult;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Horus implements Prisoner {
 
-    private int totalRounds = -1; // Anzahl der Runden
-    private int currentRound = 0; // Aktuelle Runde
-    private int gameCounter = 0; // Anzahl der Spiele
-    private boolean isTitForTat = false; // Erkenntnis über die Strategie des Gegners
-    private boolean isNiceOpponent = false; // Erkenntnis, ob Gegner nett ist
-    private int betrayStreak = 0; // Anzahl der aufeinanderfolgenden Betrügereien, (Eierleckerei)
-    private PrisonerMessResult currentDecision = PrisonerMessResult.COOPERATE; // Eigene current Entscheidung
+    private int totalRounds = -1; // Total number of rounds, aka how many times we gotta mess around.
+    private int currentRound = 0; // Counting how deep we are in this chaos.
+    private int gameCounter = 0; // How many games have we survived so far?
+    private int thresholdRounds = 0; // The magic 20% checkpoint of all rounds.
+    private boolean isTitForTat = false; // Is the opponent doing "Copycat" shenanigans?
+    private boolean isNiceOpponent = false; // Is the opponent too sweet and naive for their own good?
+    private boolean isTitForTwoTat = false; // Opponent pulling "Double Copycat" tricks?
+    private int betrayStreak = 0; // Count how many betrayals we can spam in a row.
+    private List<PrisonerMessResult> opponentHistory = new ArrayList<>(); // Opponent's chaotic move archive.
+    private PrisonerMessResult currentDecision = PrisonerMessResult.COOPERATE; // Our current plot twist.
 
     @Override
     public String getName() {
-        return "HorusSmart";
+        return "HorusSmartPlus"; // The big-brain version of Horus, Eierlecker certified.
     }
 
     @Override
     public PrisonerMessResult messAround(String opponent) {
-        currentRound++; // Runde aktualisieren
+        currentRound++; // Tick-tock, next round, let's go!
 
-        // Letzte Runde: Eier klauen. (Gegner kann mir nix)
+        // YOLO on the last round: Always betray because why not? Smells like Eierlecker to me.
         if (currentRound == totalRounds) {
             return PrisonerMessResult.BETRAY;
         }
 
-        // Gegner als nett erkannt: Ausnutzerei
+        // Found a "Nice" opponent? Time to exploit the fluff out of them!
         if (isNiceOpponent) {
             return PrisonerMessResult.BETRAY;
         }
 
-        // TitForTat Gegner erkannt: Ausnutzerei
-        if (isTitForTat) {
+        // Fighting Double Copycat? Let’s mess with their rhythm every 3 rounds like a DJ.
+        if (gameCounter >= 1 && currentRound > thresholdRounds && isTitForTwoTat) {
+            currentDecision = (currentRound % 3 == 0) ? PrisonerMessResult.BETRAY : PrisonerMessResult.COOPERATE;
+            return currentDecision;
+        }
+
+        // Fighting Single Copycat? Let’s alternate like a moody teenager.
+        if (gameCounter >= 1 && currentRound > thresholdRounds && isTitForTat) {
             currentDecision = (currentRound % 2 == 0) ? PrisonerMessResult.BETRAY : PrisonerMessResult.COOPERATE;
             return currentDecision;
         }
 
-        // Standard: TitForTat-ähnliches Verhalten
+        // Default: Be a wannabe Copycat and hope for the best.
         return currentDecision;
     }
 
     @Override
     public void onPostMessEvent(PostMessEvent postMessEvent) {
-
-        // Gegnerentscheidung speichern
+        // Store what the opponent did because receipts are important.
         PrisonerMessResult opponentDecision = postMessEvent.result();
+        opponentHistory.add(opponentDecision);
 
-        // Prüfen, ob Gegner nett ist
-        if (!isNiceOpponent && currentRound > 2) {
-            if (currentDecision == PrisonerMessResult.BETRAY) {
-                if (opponentDecision == PrisonerMessResult.COOPERATE) {
-                    betrayStreak++; // Betrügei Anzahl updaten
+        // Start overthinking life only after 20% of the game has passed and if we’ve played before.
+        if (gameCounter >= 1 && currentRound > thresholdRounds) {
+            // Sniff out "Nice" opponents: The overly polite ones we can trick.
+            if (!isNiceOpponent && currentRound > 2) {
+                if (currentDecision == PrisonerMessResult.BETRAY && opponentDecision == PrisonerMessResult.COOPERATE) {
+                    betrayStreak++;
                     if (betrayStreak >= 3) {
-                        isNiceOpponent = true; // Gegner ist nette Mann
+                        isNiceOpponent = true; // Found a sucker! Exploit time!
                     }
                 } else {
-                    betrayStreak = 0; // Gegner hat geklaut :(
+                    betrayStreak = 0; // Whoops, not that nice after all.
                 }
             }
-        } else {
-            // Gegner ist nett, aber wie lange?
-            if (opponentDecision == PrisonerMessResult.BETRAY) {
-                isNiceOpponent = false; // Gegner ist nicht mehr nett :(
-                isTitForTat = true; // Zu TitForTat wechseln weil pussy
+
+            // Spot "Double Copycat": Betray-betray-cooperate pattern detected!
+            if (!isTitForTwoTat && opponentHistory.size() >= 3) {
+                int size = opponentHistory.size();
+                if (opponentHistory.get(size - 1) == PrisonerMessResult.BETRAY &&
+                        opponentHistory.get(size - 2) == PrisonerMessResult.BETRAY &&
+                        opponentHistory.get(size - 3) == PrisonerMessResult.COOPERATE) {
+                    isTitForTwoTat = true; // Busted! It’s Double Copycat!
+                }
+            }
+
+            // Sniff out "Single Copycat": If they mirror our moves too much, we know what’s up.
+            if (!isTitForTat && currentRound > 2) {
+                if (opponentDecision == currentDecision) {
+                    isTitForTat = true; // Ah, you’re that guy.
+                }
             }
         }
 
-        // Prüfen, ob Gegner TitForTat spielt (Kopiert meinen drip)
-        if (!isTitForTat && currentRound > 2) {
-            if (opponentDecision == currentDecision) {
-                isTitForTat = true; // Gegner spiegelt unsere Entscheidungen
-            }
-        }
-
-        // Punkte-Tracking (optional, für Analyse)
-        int earnedPoints = postMessEvent.points();
-        System.out.println("Runde " + currentRound + ": Punkte erhalten: " + earnedPoints);
-
-        // Letzte Entscheidung für nächste Runde speichern
+        // Update our drama plotline based on their move.
         currentDecision = opponentDecision == PrisonerMessResult.COOPERATE
                 ? PrisonerMessResult.COOPERATE
                 : PrisonerMessResult.BETRAY;
 
-        // Nach dem ersten Spiel Rundenanzahl feststellen
+        // If it’s the first game, figure out how long this madness will last.
         if (totalRounds == -1 && gameCounter == 0) {
-            totalRounds = currentRound; // Gesamtanzahl der Runden speichern
-            currentRound = 0; // Zurücksetzen für nächstes Spiel
-            gameCounter++; // Erstes Spiel abgeschlossen
+            totalRounds = currentRound;
+            thresholdRounds = (int) Math.ceil(totalRounds * 0.2); // Math magic to find 20%.
+            currentRound = 0; // Reset, because we’re starting fresh.
+            gameCounter++; // Ding ding, game one done!
         }
     }
 }
